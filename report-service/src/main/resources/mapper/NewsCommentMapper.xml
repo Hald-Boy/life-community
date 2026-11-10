@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.report.mapper.CommentMapper">
+
+    <!-- 查询一级评论，附带子评论数量childCount 与 当前用户点赞状态liked -->
+    <select id="getCommentByNewsId" resultType="com.guat.cloud.report.entity.Comment">
+        SELECT
+            c.id,
+            c.news_id,
+            c.user_id,
+            c.parent_id,
+            c.to_user_id,
+            c.content,
+            c.status,
+            c.create_time,
+            u.username,
+            c.like_count,
+            (SELECT COUNT(1) FROM comment child WHERE child.root_comment_id = c.id AND child.status=1) AS children,
+            (SELECT CASE WHEN EXISTS(
+                SELECT 1 FROM comment_like cl
+                WHERE cl.comment_id = c.id AND cl.user_id = #{currentUserId}
+                  AND cl.is_cancel = 0
+                  AND (cl.is_deleted IS NULL OR cl.is_deleted = 0)
+            ) THEN 1 ELSE 0 END) AS liked
+        FROM comment c
+                 LEFT JOIN user u ON c.user_id = u.id
+        WHERE c.news_id = #{newsId} AND c.parent_id = 0 AND c.status = 1
+        ORDER BY c.create_time DESC
+            LIMIT #{pageNum}, #{pageSize}
+    </select>
+    <!-- 统计一级评论总数 -->
+    <select id="countRootComment" resultType="java.lang.Long">
+        SELECT COUNT(1) FROM comment WHERE news_id = #{newsId} AND parent_id = 0 AND status = 1
+    </select>
+
+
+    <!-- 查询子评论，附带当前用户点赞状态liked -->
+    <select id="getChildComment" resultType="com.guat.cloud.report.entity.Comment">
+        SELECT
+            c.id,
+            c.news_id,
+            c.user_id,
+            c.parent_id,
+            c.to_user_id,
+            c.content,
+            c.status,
+            c.root_comment_id,
+            c.create_time,
+            u.username,
+            c.like_count,
+            tu.username as toUserName,
+            (SELECT CASE WHEN EXISTS(
+                SELECT 1 FROM comment_like cl
+                WHERE cl.comment_id = c.id AND cl.user_id = #{currentUserId}
+                  AND cl.is_cancel = 0
+                  AND (cl.is_deleted IS NULL OR cl.is_deleted = 0)
+            ) THEN 1 ELSE 0 END) AS liked
+        FROM comment c
+                 LEFT JOIN user u ON c.user_id = u.id
+                 LEFT JOIN user tu ON c.to_user_id = tu.id
+        WHERE c.news_id = #{newsId} AND c.root_comment_id = #{rootCommentId} AND c.status = 1
+        ORDER BY c.create_time
+            LIMIT #{pageNum}, #{pageSize}
+    </select>
+    <!-- 统计子评论总数 -->
+    <select id="countChildComment" resultType="java.lang.Long">
+        SELECT COUNT(1) FROM comment WHERE news_id = #{newsId} AND root_comment_id = #{rootCommentId} AND status = 1
+    </select>
+
+
+
+<!--    点击一条评论，获取那条评论的ID，用来获取父评论的rootCommentId，来设置新增的评论是哪条评论的子评论-->
+    <select id="selectById" resultType="com.guat.cloud.report.entity.Comment">
+        SELECT * FROM comment WHERE id = #{id}
+    </select>
+
+<!--    发表评论-->
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO comment(news_id,user_id,parent_id,to_user_id,content,status,create_time,update_time,root_comment_id)
+        VALUES(#{newsId},#{userId},#{parentId},#{toUserId},#{content},#{status},#{createTime},#{updateTime},#{rootCommentId})
+    </insert>
+
+<!--    删除评论-->
+    <update id="deleteComment">
+        UPDATE comment SET status=0 WHERE id=#{id} AND user_id=#{userId}
+    </update>
+
+
+
+<!--    评论点赞/取消点赞-->
+    <update id="updateLikeCount">
+        UPDATE comment
+        SET like_count = COALESCE(like_count, 0) + #{delta}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!--    覆盖式设置评论点赞数（Redis 同步用，以 Redis 实际集合大小为准）-->
+    <update id="setLikeCount">
+        UPDATE comment
+        SET like_count = #{likeCount}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!--    按 id 列表批量查评论详情（热评 ZSet 拿到 id 后回表查内容，顺序由 Java 层按 ZSet 分数重排）-->
+    <select id="listByIds" resultType="com.guat.cloud.report.entity.Comment">
+        SELECT
+            c.id, c.news_id, c.user_id, c.parent_id, c.to_user_id,
+            c.content, c.status, c.create_time,
+            u.username, c.like_count,
+            (SELECT COUNT(1) FROM comment child WHERE child.root_comment_id = c.id AND child.status = 1) AS children
+        FROM comment c
+                 LEFT JOIN user u ON c.user_id = u.id
+        WHERE c.id IN
+        <foreach collection="ids" item="cid" open="(" separator="," close=")">
+            #{cid}
+        </foreach>
+          AND c.status = 1
+    </select>
+
+    <!--    预热用：查所有 status=1 的根评论，用来重建热评 ZSet（含子评论数 children）-->
+    <select id="listAllRootCommentsForWarmUp" resultType="com.guat.cloud.report.entity.Comment">
+        SELECT c.id,
+               c.news_id AS newsId,
+               c.user_id AS userId,
+               c.create_time AS createTime,
+               c.like_count AS likeCount,
+               (SELECT COUNT(1) FROM comment child WHERE child.root_comment_id = c.id AND child.status = 1) AS children
+        FROM comment c
+        WHERE c.parent_id = 0 AND c.status = 1
+    </select>
+
+<!--    更新评论状态：status 0 删除(下架) 1 正常-->
+    <update id="updateStatus">
+        UPDATE comment SET status = #{status}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+
+
+</mapper>

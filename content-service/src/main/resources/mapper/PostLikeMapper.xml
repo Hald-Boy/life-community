@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.content.mapper.PostLikeMapper">
+
+<!--    根据用户id和帖子id查询所有点赞记录-->
+    <select id="findByUserAndPost" resultType="PostLike">
+        SELECT * FROM news_like
+        WHERE user_id = #{userId} AND news_id = #{postId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+<!--    插入新闻点赞记录-->
+    <insert id="insert" parameterType="PostLike" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO news_like (news_id, user_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{newsId}, #{userId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+<!--    设置点赞记录是否有效-->
+    <update id="updateCancel">
+        UPDATE news_like SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <select id="selectByPostId" resultType="com.guat.cloud.content.entity.PostLike">
+        select id, news_id, user_id, is_cancel
+        from news_like
+        where news_id = #{postId}
+    </select>
+
+    <select id="selectAllValidLikes" resultType="com.guat.cloud.content.entity.PostLike">
+        select id, news_id, user_id, is_cancel
+        from news_like
+        where is_cancel = 0
+    </select>
+
+</mapper>

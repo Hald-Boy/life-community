@@ -1,0 +1,33 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    gateway:
+      routes:
+        - id: user-route
+          uri: lb://user-service
+          predicates:
+            - Path=/user/**
+          filters:
+            - StripPrefix=1
+        - id: content-route
+          uri: lb://content-service
+          predicates:
+            - Path=/content/**
+          filters:
+            - StripPrefix=1
+        - id: report-route
+          uri: lb://report-service
+          predicates:
+            - Path=/report/**
+          filters:
+            - StripPrefix=1
+        - id: uploads-route
+          uri: lb://content-service
+          predicates:
+            - Path=/uploads/**

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.report.mapper.NewsMapper">
+
+    <!-- 通用结果映射（对齐新库：无 category_id，含 media_type 等） -->
+    <resultMap id="BaseResultMap" type="com.guat.cloud.report.entity.News">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="user_id" property="userId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="like_count" property="likeCount"/>
+        <result column="media_type" property="mediaType"/>
+        <result column="comment_count" property="commentCount"/>
+        <result column="collect_count" property="collectCount"/>
+        <result column="status" property="status"/>
+        <result column="is_deleted" property="isDeleted"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 新增新闻 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO news (title, content, user_id, create_time, media_type, update_time)
+        VALUES (#{title}, #{content}, #{userId}, NOW(), #{mediaType}, NOW())
+    </insert>
+
+    <!-- 修改新闻 -->
+    <update id="update" parameterType="com.guat.cloud.report.entity.News">
+        UPDATE news
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="mediaType != null">media_type = #{mediaType},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 逻辑删除新闻（保留数据与文件，全站查询按 is_deleted 过滤） -->
+    <update id="logicalDelete">
+        UPDATE news SET is_deleted = '1', update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID查询新闻 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM news WHERE id = #{id}
+    </select>
+
+    <!-- 分页查询新闻（过滤已删除/已封禁，按时间倒序） -->
+    <select id="selectByPage" resultMap="BaseResultMap">
+        SELECT * FROM news
+        <where>
+            <if test="title != null and title != ''">
+                title LIKE CONCAT('%', #{title}, '%')
+            </if>
+            AND (is_deleted IS NULL OR is_deleted = '0')
+            AND (status IS NULL OR status = 0)
+        </where>
+        ORDER BY create_time DESC
+        LIMIT #{start}, #{pageSize}
+    </select>
+
+    <!-- 分页查询总记录数 -->
+    <select id="selectTotal" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM news
+        <where>
+            <if test="title != null and title != ''">
+                title LIKE CONCAT('%', #{title}, '%')
+            </if>
+            AND (is_deleted IS NULL OR is_deleted = '0')
+            AND (status IS NULL OR status = 0)
+        </where>
+    </select>
+
+    <!-- 根据id查询帖子是否存在（点赞/收藏/评论计数使用） -->
+    <select id="findById" resultType="News">
+        SELECT * FROM news WHERE id = #{id}
+    </select>
+
+    <!-- 增加帖子点赞数 纯SQL写法-->
+    <update id="updateLikeCount">
+        UPDATE news
+        SET like_count = COALESCE(like_count, 0) + #{delta}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 覆盖式设置帖子点赞总数（Redis 同步用，以 Redis 实际集合大小为准，不做累加） -->
+    <update id="setLikeCount">
+        UPDATE news
+        SET like_count = #{likeCount}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 增减收藏数 -->
+    <update id="updateCollectCount">
+        UPDATE news
+        SET collect_count = COALESCE(collect_count, 0) + #{delta}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 评论数增减 -->
+    <update id="updateCommentCount">
+        UPDATE news
+        SET comment_count = COALESCE(comment_count, 0) + #{delta}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 某用户的帖子数（我的作品） -->
+    <select id="countByUserId" resultType="int">
+        SELECT COUNT(*)
+        FROM news
+        WHERE user_id = #{userId}
+          AND (is_deleted IS NULL OR is_deleted = '0')
+          AND (status IS NULL OR status = 0)
+    </select>
+
+    <!-- 某用户的帖子分页列表（我的作品，带首图） -->
+    <select id="listByUserId" resultType="com.guat.cloud.report.dto.PostCardVO">
+        SELECT n.id, n.title, n.content, n.user_id AS userId, u.username AS userName,
+               u.avatar, u.user_account AS userAccount,
+               n.like_count, n.comment_count, n.collect_count, n.create_time,
+               (SELECT ni.image_url FROM news_image ni
+                WHERE ni.news_id = n.id
+                  AND (ni.is_delete IS NULL OR ni.is_delete = '0')
+                ORDER BY ni.sort_order ASC, ni.id ASC
+                LIMIT 1) AS cover
+        FROM news n
+        JOIN user u ON u.id = n.user_id
+        WHERE n.user_id = #{userId}
+          AND (n.is_deleted IS NULL OR n.is_deleted = '0')
+          AND (n.status IS NULL OR n.status = 0)
+          AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+        ORDER BY n.create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 更新帖子状态：status 0 正常 1 下架(封禁) -->
+    <update id="updateStatus">
+        UPDATE news SET status = #{status}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <select id="sumLikeCountByUserId" resultType="java.lang.Integer">
+        select COALESCE(sum(like_count), 0)
+        from news
+        where user_id = #{userId}
+          and is_deleted = 0
+    </select>
+</mapper>

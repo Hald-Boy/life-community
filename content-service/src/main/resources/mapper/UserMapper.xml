@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.content.mapper.UserMapper">
+
+
+    <!-- 分页查询用户（管理员用；过滤逻辑删除，返回常用字段） -->
+    <select id="selectUsers" resultType="com.guat.cloud.content.entity.User">
+        select
+        id,
+        username,
+        role,
+        user_account,
+        phone,
+        status,
+        avatar,
+        bio,
+        create_time
+        from user
+        <where>
+            <if test="username != null and username != ''">username like concat('%',#{username},'%') </if>
+            <if test="role != null">role = #{role} </if>
+            <if test="createTime != null"> create_time BETWEEN #{startTime} AND #{endTime} </if>
+            AND (is_deleted IS NULL OR is_deleted = '0')
+        </where>
+        order by create_time desc limit #{start},#{size}
+    </select>
+
+
+
+
+
+
+    <!--    修改自己信息（含改密码：仅传 password 时不会产生悬空逗号）-->
+    <update id="updateUserById" parameterType="com.guat.cloud.content.entity.User">
+        update user
+        <set>
+            <!-- 只有username不为null时，才更新username -->
+            <if test="username != null">username = #{username},</if>
+            <!-- 只有password不为null时，才更新password -->
+            <if test="password != null">password = #{password},</if>
+            <!-- 只有createtime不为null时，才更新createtime -->
+            <if test="createTime != null">create_time = #{createTime},</if>
+            update_time = NOW()
+        </set>
+        where id = #{id} <!-- 必须有id，定位要修改的user -->
+    </update>
+
+
+    <!--    管理员修改他人信息（参数为 UserInfo：id 必传，username/role 可选）-->
+    <update id="updateUser" parameterType="com.guat.cloud.content.dto.UserInfo">
+        update user
+        <set>
+            <!-- 只有username不为null时，才更新username -->
+            <if test="username != null">username = #{username},</if>
+            <!-- 只有role不为null时，才更新role -->
+            <if test="role != null">role = #{role},</if>
+            update_time = NOW()
+        </set>
+        where id = #{id} <!-- 必须有id，定位要修改的user -->
+    </update>
+
+
+<!--    根据手机号查找用户-->
+    <select id="findByPhone" resultType="User">
+        SELECT * FROM user WHERE phone = #{phone} LIMIT 1
+    </select>
+
+<!--    根据账号查询是否存在用户，避免注册到相同账号的用户-->
+    <select id="findByAccount" resultType="User">
+        SELECT * FROM user WHERE user_account = #{userAccount} LIMIT 1
+    </select>
+
+<!--    根据id查找用户-->
+    <select id="findById" resultType="User">
+        SELECT * FROM user WHERE id = #{id}
+    </select>
+
+<!--    注册成功插入数据-->
+    <insert id="insert" parameterType="User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (username, password, role, user_account, phone, status, create_time, update_time)
+        VALUES (#{username}, #{password}, 0, #{userAccount}, #{phone}, '0', NOW(), NOW())
+    </insert>
+
+
+<!--    减获赞总数，delta 可为 ±1-->
+    <update id="updateTotalLikeCount">
+        UPDATE user
+        SET total_like_count = GREATEST(COALESCE(total_like_count, 0) + #{delta},0), update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+<!--    增减关注数，delta 可为 ±1-->
+    <update id="updateFollowCount">
+        UPDATE user
+        SET follow_count = GREATEST(COALESCE(follow_count, 0) + #{delta},0), update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+<!--    增减粉丝数，delta 可为 ±1-->
+    <update id="updateFanCount">
+        UPDATE user
+        SET fan_count = GREATEST(COALESCE(fan_count, 0) + #{delta},0), update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+<!--    修改个人资料-->
+    <update id="updateProfile" parameterType="com.guat.cloud.content.dto.UserInfo">
+        UPDATE user
+        <set>
+            <if test="userInfo.username != null">username = #{userInfo.username},</if>
+            <if test="userInfo.avatar != null">avatar = #{userInfo.avatar},</if>
+            <if test="userInfo.cover != null">cover = #{userInfo.cover},</if>
+            <if test="userInfo.bio != null">bio = #{userInfo.bio},</if>
+            <if test="userInfo.birthday != null">birthday = #{userInfo.birthday},</if>
+            <if test="userInfo.location != null">location = #{userInfo.location},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{userId}
+    </update>
+
+
+    <update id="setTotalLikeCount">
+        update user
+        set total_like_count = #{count}
+        where id = #{userId}
+    </update>
+</mapper>

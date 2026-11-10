@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.content.mapper.CommentDislikeMapper">
+
+    <!--    根据用户id和评论id查询是否存在 踩评论 的记录-->
+    <select id="findByUserAndComment" resultType="CommentDislike">
+        SELECT * FROM comment_dislike
+        WHERE user_id = #{userId} AND comment_id = #{commentId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+    <!--    插入 踩评论 记录-->
+    <insert id="insert" parameterType="CommentDislike" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO comment_dislike (comment_id, user_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{commentId}, #{userId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+    <!--    更新 踩评论 是否有效 0有效 1无效-->
+    <!--    用户踩了评论之后，再次点击踩时调用-->
+    <update id="updateCancel">
+        UPDATE comment_dislike SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <!--    查询当前用户已折叠(未取消)的评论 id 集合，用于评论列表初始化渲染-->
+    <select id="findFoldedCommentIds" resultType="java.lang.Long">
+        SELECT comment_id FROM comment_dislike
+        WHERE user_id = #{userId}
+        AND comment_id IN
+        <foreach collection="commentIds" item="cid" open="(" separator="," close=")">
+            #{cid}
+        </foreach>
+        AND is_cancel = 0
+        AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+
+    <!--    统计某条评论的有效"踩"数（热评分扣分用）-->
+    <select id="countValidByCommentId" resultType="int">
+        SELECT COUNT(1) FROM comment_dislike
+        WHERE comment_id = #{commentId}
+          AND is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+</mapper>

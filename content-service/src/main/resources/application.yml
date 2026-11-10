@@ -1,0 +1,34 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: content-service
+  config:
+    import: optional:nacos:content-service.yaml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    sentinel:
+      transport:
+        dashboard: localhost:8858
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.guat.cloud.content.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.guat.cloud.content.mapper: DEBUG
+
+feign:
+  sentinel:
+    enabled: true

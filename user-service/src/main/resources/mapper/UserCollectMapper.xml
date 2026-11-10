@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.user.mapper.UserCollectMapper">
+
+<!--    查询收藏记录-->
+    <select id="findByUserAndTarget" resultType="com.guat.cloud.user.entity.UserCollect">
+        SELECT * FROM user_collect
+        WHERE user_id = #{userId} AND collect_type = #{collectType} AND target_id = #{targetId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+<!--    插入收藏记录-->
+    <insert id="insert" parameterType="com.guat.cloud.user.entity.UserCollect" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_collect (user_id, collect_type, target_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{userId}, #{collectType}, #{targetId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+<!--    更新收藏状态是否有效-->
+    <update id="updateCancel">
+        UPDATE user_collect SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+<!--    帖子收藏数-->
+    <select id="countCollectedPosts" resultType="int">
+        SELECT COUNT(*)
+        FROM user_collect c
+                 JOIN news n ON n.id = c.target_id
+        WHERE c.user_id = #{userId} AND c.collect_type = 1 AND c.is_cancel = 0
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+          AND (n.is_deleted IS NULL OR n.is_deleted = '0')
+    </select>
+
+<!--    帖子收藏集合-->
+    <select id="listCollectedPosts" resultType="com.guat.cloud.user.dto.PostCardVO">
+        SELECT n.id, n.title, n.content, n.user_id AS userId, u.username AS userName,
+               u.avatar, u.user_account AS userAccount,
+               n.like_count, n.comment_count, n.collect_count, n.create_time,
+               (SELECT ni.image_url FROM news_image ni
+                WHERE ni.news_id = n.id
+                ORDER BY ni.sort_order ASC, ni.id ASC
+                   LIMIT 1) AS cover
+        FROM user_collect c
+            JOIN news n ON n.id = c.target_id
+            JOIN user u ON u.id = n.user_id
+        WHERE c.user_id = #{userId} AND c.collect_type = 1 AND c.is_cancel = 0
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+          AND (n.is_deleted IS NULL OR n.is_deleted = '0')
+          AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+        ORDER BY c.create_time DESC
+            LIMIT #{offset}, #{limit}
+    </select>
+
+<!--    评论收藏数-->
+    <select id="countCollectedComments" resultType="int">
+        SELECT COUNT(*)
+        FROM user_collect c
+                 JOIN comment cm ON cm.id = c.target_id
+        WHERE c.user_id = #{userId} AND c.collect_type = 2 AND c.is_cancel = 0
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+          AND (cm.status IS NULL OR cm.status = 1)
+    </select>
+
+<!--    评论收藏列表-->
+    <select id="listCollectedComments" resultType="com.guat.cloud.user.dto.CommentCardVO">
+        SELECT cm.id, u.username, cm.content, cm.like_count, cm.news_id, cm.create_time,
+               n.title AS post_title
+        FROM user_collect c
+                 JOIN comment cm ON cm.id = c.target_id
+                 LEFT JOIN news n ON n.id = cm.news_id
+                 LEFT JOIN user u ON u.id = cm.user_id
+        WHERE c.user_id = #{userId} AND c.collect_type = 2 AND c.is_cancel = 0
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+          AND (cm.status IS NULL OR cm.status = 1)
+        ORDER BY c.create_time DESC
+            LIMIT #{offset}, #{limit}
+    </select>
+</mapper>

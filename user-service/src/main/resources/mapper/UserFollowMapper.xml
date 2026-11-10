@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.user.mapper.UserFollowMapper">
+
+<!--    查询 “用户关注表user_follow” 是否已经存在有效的关注记录-->
+    <select id="findByUserAndFollowUser" resultType="UserFollow">
+        SELECT * FROM user_follow
+        WHERE user_id = #{userId} AND follow_user_id = #{followUserId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+
+<!--    插入关注记录到 “用户关注表user_follow”-->
+    <insert id="insert" parameterType="UserFollow" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_follow (user_id, follow_user_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{userId}, #{followUserId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+
+<!--    设置对应id的关注状态-->
+<!--    2026/9/4    WHERE后加isCancel = #{oldIsCancel}条件-->
+    <update id="updateCancel">
+        UPDATE user_follow SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id} AND is_cancel = #{oldIsCancel}
+    </update>
+
+
+<!--    查询某用户的关注总数-->
+    <select id="countFollowing" resultType="int">
+        SELECT COUNT(*) FROM user_follow
+        WHERE user_id = #{userId} AND is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+
+
+<!--    查询某用户的被关注总数-->
+    <select id="countFans" resultType="int">
+        SELECT COUNT(*) FROM user_follow
+        WHERE follow_user_id = #{followUserId} AND is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+
+
+<!--    查询当前用户关注的全部用户id合集-->
+    <select id="findFollowingIds" resultType="java.lang.Long">
+        SELECT follow_user_id FROM user_follow
+        WHERE user_id = #{userId} AND is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+
+
+<!--    在给定id集合中，哪些用户关注了当前用户（场景：互关判断）-->
+    <select id="findMutualTargets" resultType="java.lang.Long">
+        SELECT user_id FROM user_follow
+        WHERE follow_user_id = #{userId}
+        AND is_cancel = 0
+        AND (is_deleted IS NULL OR is_deleted = 0)
+        AND user_id IN
+        <foreach collection="targetIds" item="tid" open="(" separator="," close=")">
+            #{tid}
+        </foreach>
+    </select>
+
+
+<!--    关注列表-->
+    <select id="listFollowing" resultType="User">
+        SELECT u.*
+        FROM user u
+                 JOIN user_follow f ON u.id = f.follow_user_id
+        WHERE f.user_id = #{userId} AND f.is_cancel = 0
+          AND (f.is_deleted IS NULL OR f.is_deleted = 0)
+        ORDER BY f.create_time DESC
+            LIMIT #{offset}, #{limit}
+    </select>
+
+
+<!--    粉丝列表-->
+    <select id="listFans" resultType="User">
+        SELECT u.*
+        FROM user u
+                 JOIN user_follow f ON u.id = f.user_id
+        WHERE f.follow_user_id = #{followUserId} AND f.is_cancel = 0
+          AND (f.is_deleted IS NULL OR f.is_deleted = 0)
+        ORDER BY f.create_time DESC
+            LIMIT #{offset}, #{limit}
+    </select>
+</mapper>

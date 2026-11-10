@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.content.mapper.PostDisinterestMapper">
+
+<!--    根据用户id和帖子id查询是否存在不感兴趣的记录-->
+    <select id="findByUserAndPost" resultType="PostDisinterest">
+        SELECT * FROM user_dislike_post
+        WHERE user_id = #{userId} AND post_id = #{postId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+<!--    插入不感兴趣记录-->
+    <insert id="insert" parameterType="PostDisinterest" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_dislike_post (post_id, user_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{postId}, #{userId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+<!--    更新不感兴趣记录的状态-->
+    <update id="updateCancel">
+        UPDATE user_dislike_post SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+<!--    当前用户不感兴趣的帖子 id 集合（feed 过滤用）-->
+    <select id="findDisinterestPostIds" resultType="java.lang.Long">
+        SELECT post_id FROM user_dislike_post
+        WHERE user_id = #{userId} AND is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+</mapper>

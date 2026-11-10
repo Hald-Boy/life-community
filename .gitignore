@@ -1,0 +1,31 @@
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Maven
+target/
+
+# Logs
+*.log
+*.err.log
+
+# Runtime data
+dump.rdb
+db-backup/
+uploads/
+
+# Test output JSON (root only)
+/batch.json
+/body.json
+/login.json
+/reg.json
+
+# Seed image assets (large binaries)
+seed_assets/
+
+# OS
+Thumbs.db
+Desktop.ini

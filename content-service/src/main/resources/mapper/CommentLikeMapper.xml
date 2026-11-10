@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guat.cloud.content.mapper.CommentLikeMapper">
+
+    <!--    根据用户id和评论id查询是否已存在点赞记录-->
+    <select id="findByUserAndComment" resultType="CommentLike">
+        SELECT * FROM comment_like
+        WHERE user_id = #{userId} AND comment_id = #{commentId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+        ORDER BY id DESC
+            LIMIT 1
+    </select>
+
+    <!--    插入评论点赞记录-->
+    <insert id="insert" parameterType="CommentLike" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO comment_like (comment_id, user_id, is_cancel, create_time, update_time, is_deleted)
+        VALUES (#{commentId}, #{userId}, #{isCancel}, NOW(), NOW(), 0)
+    </insert>
+
+    <!--    修改评论点赞的状态  0有效 1取消-->
+    <update id="updateCancel">
+        UPDATE comment_like SET is_cancel = #{isCancel}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <!--    查询某条评论的全部点赞历史记录（定时任务 diff 用）-->
+    <select id="selectByCommentId" resultType="CommentLike">
+        SELECT * FROM comment_like
+        WHERE comment_id = #{commentId}
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+
+    <!--    查询全表所有有效点赞记录（启动预热用）-->
+    <select id="selectAllValidLikes" resultType="CommentLike">
+        SELECT * FROM comment_like
+        WHERE is_cancel = 0
+          AND (is_deleted IS NULL OR is_deleted = 0)
+    </select>
+</mapper>
