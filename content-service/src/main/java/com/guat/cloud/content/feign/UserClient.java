@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
 
 // @FeignClient：声明"我要调哪个服务"，name = Nacos 注册的服务名（一字不差）
-@FeignClient(name = "user-service",fallback = UserClientFallback.class)
+@FeignClient(name = "user-service")
 public interface UserClient {
 
     // @GetMapping：声明"发什么请求到哪个路径"——和 InnerUserController 完全一致
@@ -22,8 +22,4 @@ public interface UserClient {
     // 批量接口
     @PostMapping("/publicApi/inner/user/batch")
     Result<List<UserInfo>> batchGetUserInfo(@RequestBody List<Long> ids);
-
-    // 测试熔断接口
-    @GetMapping("/publicApi/inner/test/slow")
-    String testSlow();
 }

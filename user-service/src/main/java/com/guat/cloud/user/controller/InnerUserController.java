@@ -43,13 +43,4 @@ public class InnerUserController {
         }
         return Result.success(users);
     }
-
-    /**
-     * 测试熔断的接口
-     */
-    @GetMapping("/publicApi/inner/test/slow")
-    public String testSlow() throws InterruptedException {
-        Thread.sleep(3000);   // 故意睡 3 秒，模拟慢调用
-        return "user-service 正常响应";
-    }
 }
